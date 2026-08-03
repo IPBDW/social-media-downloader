@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Downloader</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>Social Downloader</h1>
+    <p>Download video/audio dari TikTok, YouTube, Instagram, Reddit, Facebook, dan lainnya</p>
+  </div>
+
+  <div class="card">
+    <div class="input-group">
+      <input type="url" id="urlInput" placeholder="Tempel link video di sini..." autofocus>
+      <button id="scanBtn" onclick="scanUrl()">Scan</button>
+    </div>
+  </div>
+
+  <div id="scanResult" class="scan-result hidden">
+    <div class="scan-info">
+      <div class="thumb-wrap">
+        <img id="thumbnail" src="" alt="thumbnail">
+        <span id="thumbDuration" class="thumb-duration"></span>
+      </div>
+      <div class="scan-details">
+        <div id="videoTitle" class="video-title"></div>
+        <div id="videoStatus" class="video-status"></div>
+      </div>
+    </div>
+
+    <div id="pickFormat" class="pick-format">
+      <button class="pick-btn mp4" onclick="startDownload('mp4')">
+        <span class="pick-icon">🎬</span>
+        <span class="pick-label">MP4</span>
+      </button>
+      <button class="pick-btn mp3" onclick="startDownload('mp3')">
+        <span class="pick-icon">🎵</span>
+        <span class="pick-label">MP3</span>
+      </button>
+    </div>
+
+    <div id="progressArea" class="progress-area hidden">
+      <div class="progress-bar">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+      <div class="progress-text">
+        <span id="progressPercent">0%</span>
+        <span id="progressSpeed"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="/script.js"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"23f723cf25cd483182873ff26cb42066","r":1}' crossorigin="anonymous"></script>
+</body>
+</html>
