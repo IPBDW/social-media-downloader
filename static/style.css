@@ -281,3 +281,124 @@ body {
     transform: translateX(-50%) translateY(0);
   }
 }
+
+/* Cookie Auth card */
+.cookie-card {
+  margin-top: 16px;
+  border-left: 3px solid var(--accent);
+}
+
+.cookie-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cookie-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.cookie-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.cookie-desc code {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}
+
+.cookie-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cookie-status.active {
+  background: rgba(63,185,80,0.15);
+  color: var(--success);
+}
+
+.cookie-status.error {
+  background: rgba(248,81,73,0.15);
+  color: var(--error);
+}
+
+.cookie-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.cookie-upload-btn {
+  display: inline-block;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.cookie-upload-btn:hover {
+  border-color: var(--accent);
+  background: rgba(88,166,255,0.1);
+}
+
+.cookie-clear-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--error);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.cookie-clear-btn:hover {
+  border-color: var(--error);
+}
+
+.cookie-help {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cookie-help summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-size: 12px;
+  user-select: none;
+}
+
+.cookie-help ol {
+  margin: 8px 0 0 18px;
+  line-height: 1.7;
+}
+
+.cookie-help code {
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 11px;
+}

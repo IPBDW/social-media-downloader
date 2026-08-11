@@ -3,6 +3,7 @@ import asyncio
 import os
 import re
 import tempfile
+import unicodedata
 import yt_dlp
 from urllib.parse import quote
 from fastapi import APIRouter, Request, HTTPException, UploadFile, File
@@ -25,6 +26,15 @@ class ScanRequest(BaseModel):
 class DownloadRequest(BaseModel):
     url: str
     format: str = "mp4"
+
+
+def sanitize_filename(title):
+    name = unicodedata.normalize('NFKD', title)
+    name = name.encode('ascii', 'ignore').decode('ascii')
+    name = re.sub(r'[^\w\s.-]', '', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    name = re.sub(r'[.\s]+$', '', name)
+    return name if name else "download"
 
 
 @router.post("/scan")
@@ -95,6 +105,20 @@ async def upload_cookies(file: UploadFile = File(...)):
     return {"message": "Cookies berhasil disimpan"}
 
 
+@router.delete("/cookies")
+async def delete_cookies():
+    if not dm.cookies_path:
+        return {"message": "Tidak ada cookies untuk dihapus"}
+
+    try:
+        os.remove(dm.cookies_path)
+    except OSError:
+        pass
+
+    dm.cookies_path = None
+    return {"message": "Cookies berhasil dihapus"}
+
+
 @router.get("/cookies/status")
 async def cookies_status():
     return {
@@ -136,11 +160,6 @@ async def progress(download_id: str):
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
-def sanitize_filename(title):
-    name = re.sub(r'[^\x00-\xFF]', '_', title)
-    name = re.sub(r'_+', '_', name).strip('_')
-    return name if name else "download"
-
 
 @router.get("/file/{download_id}")
 async def get_file(download_id: str):
@@ -164,7 +183,7 @@ async def get_file(download_id: str):
 
     safe_title = sanitize_filename(title)
     filename = f"{safe_title}.{ext}"
-    encoded_filename = quote(safe_title) + f".{ext}"
+    encoded_filename = quote(filename)
 
     def cleanup():
         dm.delete_file_and_state(download_id)

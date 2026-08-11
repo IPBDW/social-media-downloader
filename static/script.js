@@ -14,6 +14,72 @@ function showToast(msg, type) {
   t._hide = setTimeout(() => t.classList.add('hidden'), 4000);
 }
 
+async function checkCookieStatus() {
+  const el = document.getElementById('cookieStatus');
+  try {
+    const res = await fetch('/api/cookies/status');
+    const data = await res.json();
+    if (data.active) {
+      el.textContent = 'Aktif';
+      el.className = 'cookie-status active';
+      document.getElementById('cookieClearBtn').classList.remove('hidden');
+    } else {
+      el.textContent = 'Tidak aktif';
+      el.className = 'cookie-status';
+      document.getElementById('cookieClearBtn').classList.add('hidden');
+    }
+  } catch (e) {
+    el.textContent = 'Gagal cek';
+    el.className = 'cookie-status error';
+  }
+}
+
+async function uploadCookies(file) {
+  if (!file) return;
+  if (!file.name.toLowerCase().endsWith('.txt')) {
+    showToast('File harus berupa cookies.txt', 'error');
+    return;
+  }
+  const fd = new FormData();
+  fd.append('file', file);
+  const el = document.getElementById('cookieStatus');
+  el.textContent = 'Uploading...';
+  el.className = 'cookie-status';
+  try {
+    const res = await fetch('/api/cookies', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Gagal upload cookies');
+    el.textContent = 'Aktif';
+    el.className = 'cookie-status active';
+    document.getElementById('cookieClearBtn').classList.remove('hidden');
+    showToast('Cookies berhasil disimpan!', 'success');
+  } catch (e) {
+    el.textContent = 'Gagal upload';
+    el.className = 'cookie-status error';
+    showToast(e.message, 'error');
+  }
+}
+
+async function clearCookies() {
+  const el = document.getElementById('cookieStatus');
+  el.textContent = 'Menghapus...';
+  el.className = 'cookie-status';
+  try {
+    const res = await fetch('/api/cookies', { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Gagal hapus cookies');
+    el.textContent = 'Tidak aktif';
+    el.className = 'cookie-status';
+    document.getElementById('cookieClearBtn').classList.add('hidden');
+    document.getElementById('cookieFile').value = '';
+    showToast('Cookies dihapus', 'success');
+  } catch (e) {
+    el.textContent = 'Gagal hapus';
+    el.className = 'cookie-status error';
+    showToast(e.message, 'error');
+  }
+}
+
 function showScanResult() {
   document.getElementById('scanResult').classList.remove('hidden');
 }
@@ -247,3 +313,9 @@ function listenProgress(id, fmt) {
 document.getElementById('urlInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') scanUrl();
 });
+
+document.getElementById('cookieFile').addEventListener('change', (e) => {
+  uploadCookies(e.target.files[0]);
+});
+
+checkCookieStatus();

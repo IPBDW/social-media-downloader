@@ -1,14 +1,14 @@
 services:
   social-downloader:
+    build: .
     image: socialmedia-downloader:latest
     container_name: social-downloader
     restart: unless-stopped
     ports:
       - "8080:8000"
     working_dir: /app
-    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
     tmpfs:
-      - /tmp:size=100M,noexec,nosuid
+      - /tmp:size=2G
     extra_hosts:
       - "reddit.com:151.101.129.140"
       - "www.reddit.com:151.101.129.140"

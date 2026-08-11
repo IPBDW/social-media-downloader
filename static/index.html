@@ -21,6 +21,30 @@
     </div>
   </div>
 
+  <div class="card cookie-card">
+    <div class="cookie-header">
+      <div>
+        <div class="cookie-title">Cookie Auth</div>
+        <div class="cookie-desc">Upload <code>cookies.txt</code> untuk platform yang butuh login (TikTok, Instagram, dll).</div>
+      </div>
+      <span id="cookieStatus" class="cookie-status">Cek...</span>
+    </div>
+    <div class="cookie-actions">
+      <label class="cookie-upload-btn" for="cookieFile">Pilih cookies.txt</label>
+      <input type="file" id="cookieFile" accept=".txt" hidden>
+      <button id="cookieClearBtn" class="cookie-clear-btn hidden" onclick="clearCookies()">Hapus</button>
+    </div>
+    <details class="cookie-help">
+      <summary>Cara export cookies.txt dari browser</summary>
+      <ol>
+        <li>Login ke TikTok/Instagram di browser, buka halaman video-nya.</li>
+        <li>Pasang ekstensi seperti <strong>Get cookies.txt LOCALLY</strong> (Chrome/Firefox).</li>
+        <li>Klik ikon ekstensi di halaman tersebut, lalu <strong>Export</strong>.</li>
+        <li>Upload file <code>cookies.txt</code> hasil export di sini.</li>
+      </ol>
+    </details>
+  </div>
+
   <div id="scanResult" class="scan-result hidden">
     <div class="scan-info">
       <div class="thumb-wrap">
