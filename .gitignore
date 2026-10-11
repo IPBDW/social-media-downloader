@@ -5,3 +5,11 @@ __pycache__/
 !requirements.txt
 /tmp/
 *.log
+.venv/
+venv/
+.envrc
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.openchamber/
