@@ -1,14 +1,11 @@
-import os
-import sys
 import asyncio
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from routers.download import router as download_router, dm
+from backend.routers.download import router as download_router, dm
 
 
 async def cleanup_task():

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from starlette.background import BackgroundTask
-from services.downloader import DownloadManager
+from backend.services.downloader import DownloadManager
 
 router = APIRouter(prefix="/api")
 limiter = Limiter(key_func=get_remote_address)
@@ -29,11 +29,21 @@ class DownloadRequest(BaseModel):
 
 
 def sanitize_filename(title):
-    name = unicodedata.normalize('NFKD', title)
-    name = name.encode('ascii', 'ignore').decode('ascii')
-    name = re.sub(r'[^\w\s.-]', '', name)
+    # Hanya strip karakter yang ilegal di filesystem + control chars.
+    # JANGAN transliterate ke ASCII; UTF-8 filename aman di semua OS modern
+    # dan Content-Disposition sudah dukung filename*=UTF-8''.
+    name = unicodedata.normalize('NFC', title)
+    # Hapus control chars
+    name = re.sub(r'[\x00-\x1f\x7f]', '', name)
+    # Ganti karakter yang ilegal di Windows/macOS/Linux
+    name = re.sub(r'[<>:"/\\|?*]', '_', name)
+    # Collapse whitespace
     name = re.sub(r'\s+', ' ', name).strip()
+    # Hapus trailing dot/spasi (aneh di Windows)
     name = re.sub(r'[.\s]+$', '', name)
+    # Limit panjang (Windows MAX_PATH)
+    if len(name) > 200:
+        name = name[:200].strip()
     return name if name else "download"
 
 
@@ -45,9 +55,7 @@ async def scan_url(request: Request, data: ScanRequest):
         raise HTTPException(400, "URL tidak boleh kosong")
 
     try:
-        info_opts = {"quiet": True, "no_warnings": True}
-        if dm.cookies_path and os.path.exists(dm.cookies_path):
-            info_opts["cookiefile"] = dm.cookies_path
+        info_opts = dm._base_opts()
         with yt_dlp.YoutubeDL(info_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             title = info.get("title", "Video")
@@ -88,18 +96,34 @@ async def start_download(request: Request, data: DownloadRequest):
     return {"download_id": download_id, "message": "Download dimulai"}
 
 
+MAX_COOKIE_SIZE = 1 * 1024 * 1024  # 1 MB; cookies.txt biasanya <50 KB
+
+
 @router.post("/cookies")
 async def upload_cookies(file: UploadFile = File(...)):
-    if not file.filename.endswith(".txt"):
+    if not file.filename or not file.filename.endswith(".txt"):
         raise HTTPException(400, "File harus berupa cookies.txt")
+
+    # Validasi ukuran pakai Content-Length header kalau ada
+    if file.size is not None and file.size > MAX_COOKIE_SIZE:
+        raise HTTPException(413, f"File terlalu besar (max {MAX_COOKIE_SIZE // 1024} KB)")
 
     ext_dir = os.path.join(tempfile.gettempdir(), "social-downloader")
     os.makedirs(ext_dir, exist_ok=True)
     dest = os.path.join(ext_dir, "cookies.txt")
 
-    content = await file.read()
+    # Baca dengan batas ukuran
+    content = bytearray()
+    while True:
+        chunk = await file.read(64 * 1024)
+        if not chunk:
+            break
+        content.extend(chunk)
+        if len(content) > MAX_COOKIE_SIZE:
+            raise HTTPException(413, f"File terlalu besar (max {MAX_COOKIE_SIZE // 1024} KB)")
+
     with open(dest, "wb") as f:
-        f.write(content)
+        f.write(bytes(content))
 
     dm.set_cookies(dest)
     return {"message": "Cookies berhasil disimpan"}

@@ -9,6 +9,12 @@ services:
     working_dir: /app
     tmpfs:
       - /tmp:size=2G
+    environment:
+      # Set log level: DEBUG, INFO, WARNING, ERROR
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Max file size download (MB). Default 1024 (1 GB)
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-1024}
+      - PYTHONUNBUFFERED=1
     extra_hosts:
       - "reddit.com:151.101.129.140"
       - "www.reddit.com:151.101.129.140"

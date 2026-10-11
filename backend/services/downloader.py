@@ -6,14 +6,20 @@ import asyncio
 import tempfile
 import time
 import logging
+import uuid
 import yt_dlp
 
+LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=getattr(logging, LOG_LEVEL, logging.INFO),
     format="%(asctime)s [%(levelname)s] %(message)s",
     stream=sys.stdout,
 )
 log = logging.getLogger("downloader")
+
+
+# Limit ukuran file download (default 1 GB; override via env)
+MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", "1024"))
 
 
 class DownloadManager:
@@ -31,7 +37,8 @@ class DownloadManager:
         log.info("Cookies set: %s", path)
 
     def create_download(self, url, fmt):
-        download_id = str(int(time.time() * 1000))[-10:]
+        # UUID lebih aman dari collision dibanding timestamp
+        download_id = uuid.uuid4().hex[:16]
         with self.lock:
             self.states[download_id] = {
                 "url": url,
@@ -79,48 +86,129 @@ class DownloadManager:
         self.pop_state(download_id)
 
     def purge_old_states(self, max_age=60):
+        """Bersihkan state yang:
+        - sudah lebih dari `max_age` detik sejak dibuat dan tidak aktif, ATAU
+        - status complete + sudah pernah didownload user (served), ATAU
+        - status complete tapi lebih dari 5 menit tanpa di-serve (file nyangkut).
+        """
         now = time.time()
+        active_statuses = ("queued", "extracting", "downloading", "processing")
+        stuck_complete_age = 300  # 5 menit
+
         with self.lock:
             stale = [
                 did for did, s in self.states.items()
                 if s.get("created_at", 0) < now - max_age
+                and s.get("status") not in active_statuses
             ]
-            serving = [
+            served = [
                 did for did, s in self.states.items()
                 if s.get("served") and s.get("status") == "complete"
             ]
-            all_stale = list(set(stale + serving))
+            stuck_complete = [
+                did for did, s in self.states.items()
+                if s.get("status") == "complete"
+                and not s.get("served")
+                and s.get("created_at", 0) < now - stuck_complete_age
+            ]
+            all_stale = list(set(stale + served + stuck_complete))
+
+            has_active = any(
+                s.get("status") in active_statuses
+                for s in self.states.values()
+            )
+
         if all_stale:
-            log.info("Purging %d states (stale: %d, served: %d)", len(all_stale), len(stale), len(serving))
+            log.info("Purging %d states (stale: %d, served: %d, stuck: %d)",
+                     len(all_stale), len(stale), len(served), len(stuck_complete))
         for did in all_stale:
             self.delete_file_and_state(did)
-        self._cleanup_dir()
+
+        # Hanya bersihkan orphan kalau TIDAK ada download aktif
+        if not has_active:
+            self._cleanup_dir()
+        else:
+            log.debug("Skipping dir cleanup (active downloads in progress)")
 
     def _cleanup_dir(self):
+        """Hapus file orphan yang bukan milik state aktif.
+
+        Penting: JANGAN hapus partial files (.part, .ytdl, .tmp) dari
+        download yang sedang berjalan (status extracting/downloading/processing).
+        """
         try:
             if not os.path.exists(self.downloads_dir):
                 return
+
+            # Kumpulkan semua download_id yang masih punya state (aktif ATAU complete)
+            with self.lock:
+                active_ids = {
+                    did for did, s in self.states.items()
+                    if s.get("status") in (
+                        "queued", "extracting", "downloading", "processing",
+                    )
+                }
+                all_ids = set(self.states.keys())
+
+            # File yang harus di-protect dari cleanup
+            protected = set()
+            if self.cookies_path:
+                protected.add(os.path.basename(self.cookies_path))
+
             for f in os.listdir(self.downloads_dir):
                 filepath = os.path.join(self.downloads_dir, f)
-                if os.path.isfile(filepath):
-                    try:
-                        os.remove(filepath)
-                        log.debug("Cleaned up orphan file: %s", filepath)
-                    except OSError:
-                        pass
+
+                if not os.path.isfile(filepath):
+                    continue
+
+                # Never delete cookies file
+                if f in protected:
+                    continue
+
+                # Skip kalau filename diawali download_id yang aktif
+                belongs_to_active = any(
+                    f == did or f.startswith(f"{did}.")
+                    for did in active_ids
+                )
+                if belongs_to_active:
+                    log.debug("Skipping active file: %s", filepath)
+                    continue
+
+                # Skip partial files kalau ada active download apapun
+                is_partial = f.endswith((".part", ".ytdl", ".tmp"))
+                if is_partial and active_ids:
+                    log.debug("Skipping orphan partial (active download exists): %s",
+                              filepath)
+                    continue
+
+                # Skip files milik state yang belum stale (complete tapi belum served)
+                belongs_to_any = any(
+                    f == did or f.startswith(f"{did}.")
+                    for did in all_ids
+                )
+                if belongs_to_any:
+                    log.debug("Skipping file with live state: %s", filepath)
+                    continue
+
+                try:
+                    os.remove(filepath)
+                    log.debug("Cleaned up orphan file: %s", filepath)
+                except OSError:
+                    pass
         except Exception as e:
             log.warning("Dir cleanup error: %s", e)
 
-    def _base_opts(self, progress_hook):
+    def _base_opts(self, progress_hook=None, quiet=True):
         opts = {
-            "quiet": True,
+            "quiet": quiet,
             "no_warnings": True,
-            "progress_hooks": [progress_hook],
             "http_headers": {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
                 "Accept-Language": "en-US,en;q=0.9",
             },
         }
+        if progress_hook is not None:
+            opts["progress_hooks"] = [progress_hook]
         if self.cookies_path and os.path.exists(self.cookies_path):
             opts["cookiefile"] = self.cookies_path
             log.debug("Using cookies: %s", self.cookies_path)
@@ -160,7 +248,6 @@ class DownloadManager:
             }
 
             def progress_hook(d):
-                now = time.time()
                 status = d.get("status", "")
                 log.debug("Progress hook: id=%s status=%s progress=%s",
                           download_id, status, d.get("_percent_str", "?"))
@@ -221,22 +308,35 @@ class DownloadManager:
 
             log.info("Extracting video info... id=%s", download_id)
             try:
-                info_opts = {"quiet": True, "no_warnings": True}
-                if self.cookies_path and os.path.exists(self.cookies_path):
-                    info_opts["cookiefile"] = self.cookies_path
+                # Pakai _base_opts yang sama dengan download (User-Agent dll)
+                info_opts = self._base_opts()
                 with yt_dlp.YoutubeDL(info_opts) as ydl:
                     info = ydl.extract_info(url, download=False)
                     title = info.get("title", "video")
                     thumbnail = info.get("thumbnail", "")
                     duration = info.get("duration", 0)
+
+                    # Cek estimasi ukuran file — reject kalau terlalu besar
+                    filesize = (
+                        info.get("filesize")
+                        or info.get("filesize_approx")
+                        or 0
+                    )
+                    if filesize and filesize > MAX_FILE_SIZE_MB * 1024 * 1024:
+                        msg = (f"File terlalu besar ({filesize / 1024 / 1024:.1f} MB). "
+                               f"Max {MAX_FILE_SIZE_MB} MB.")
+                        log.warning("Reject: id=%s size=%s", download_id, filesize)
+                        self.update_state(download_id, status="error", message=msg)
+                        return
+
                     mins, secs = divmod(int(duration), 60)
                     hrs, mins = divmod(mins, 60)
                     if hrs:
                         duration_str = f"{hrs}:{mins:02d}:{secs:02d}"
                     else:
                         duration_str = f"{mins}:{secs:02d}"
-                    log.info("Info extracted: id=%s title='%s' duration=%ss",
-                             download_id, title, duration)
+                    log.info("Info extracted: id=%s title='%s' duration=%ss size=%s",
+                             download_id, title, duration, filesize)
                     self.update_state(
                         download_id,
                         title=title,

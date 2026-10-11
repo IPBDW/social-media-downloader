@@ -132,6 +132,13 @@ async function scanUrl() {
   setButtonLoading(btn, true, 'Scan');
   state.scannedUrl = url;
 
+  // Tutup EventSource lama kalau ada download yang masih jalan
+  closeEventSource();
+  if (state.isDownloading) {
+    state.isDownloading = false;
+    state.downloadId = null;
+  }
+
   hideScanResult();
   resetProgressArea();
 
