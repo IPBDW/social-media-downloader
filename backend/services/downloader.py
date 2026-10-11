@@ -85,15 +85,18 @@ class DownloadManager:
         self.delete_file(download_id)
         self.pop_state(download_id)
 
-    def purge_old_states(self, max_age=60):
+    def purge_old_states(self, max_age=600):
         """Bersihkan state yang:
         - sudah lebih dari `max_age` detik sejak dibuat dan tidak aktif, ATAU
         - status complete + sudah pernah didownload user (served), ATAU
-        - status complete tapi lebih dari 5 menit tanpa di-serve (file nyangkut).
+        - status complete tapi lebih dari 10 menit tanpa di-serve (file nyangkut).
+
+        Default max_age=600 (10 menit) sesuai requirement "platform sementara":
+        file harus hilang otomatis paling lambat 10 menit setelah user selesai download.
         """
         now = time.time()
         active_statuses = ("queued", "extracting", "downloading", "processing")
-        stuck_complete_age = 300  # 5 menit
+        stuck_complete_age = 600  # 10 menit
 
         with self.lock:
             stale = [

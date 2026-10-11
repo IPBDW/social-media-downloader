@@ -11,11 +11,13 @@ from backend.routers.download import router as download_router, dm
 async def cleanup_task():
     while True:
         await asyncio.sleep(30)
-        dm.purge_old_states(max_age=60)
+        # max_age=600 → hapus state yang >10 menit sejak dibuat (sesuai requirement "platform sementara")
+        dm.purge_old_states(max_age=600)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Bersihkan semua state lama saat startup (max_age=0 → semua di-purge)
     dm.purge_old_states(max_age=0)
     task = asyncio.create_task(cleanup_task())
     yield
